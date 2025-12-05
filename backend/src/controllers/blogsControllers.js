@@ -5,7 +5,11 @@ export const createBlog = async (req, res) => {
     const { title, content } = req.body;
     const newBlog = new Blog({ title, content });
     newBlog.save();
-    res.status(200).json({ message: "new note created sucessfully" });
+    res.status(200).json({
+      _id: newBlog.id,
+      title: newBlog.title,
+      content: newBlog.content,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -13,11 +17,15 @@ export const createBlog = async (req, res) => {
 
 export const editBlog = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const blogId = req.paramas.id;
+    const { title, content } = req.body;
+    // const userId = req.user.id;
+    const blogId = req.params.id;
+    console.log(blogId);
     const blog = await Blog.findOneAndUpdate(
-      blogId,
-      userId,
+      {
+        _id: blogId,
+        // userId,
+      },
       { title, content },
       { new: true, runValidators: true }
     );
@@ -25,9 +33,10 @@ export const editBlog = async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
 
-    return res.status(200).json({
-      message: "blogs updated successfully",
-      blog: blog,
+    res.status(200).json({
+      _id: blog.id,
+      title: blog.title,
+      content: blog.content,
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -35,10 +44,10 @@ export const editBlog = async (req, res) => {
 };
 
 export const deleteBlog = async (req, res) => {
-  const userId = req.user.id;
-  const delBlog = req.paramas.id;
+  // const userId = req.user.id;
+  const delBlog = req.params.id;
   try {
-    const deleteBlog = await Blog.findOneAndDelete({ delBlog });
+    const deleteBlog = await Blog.findOneAndDelete({ _id: delBlog });
     if (!deleteBlog) return res.status(400).json({ message: error.message });
 
     return res.status(200).json({
@@ -52,21 +61,24 @@ export const deleteBlog = async (req, res) => {
 
 export const allblogs = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const allblog = await Blog.find(userId).sort({ createdAt: -1 }).lean();
+    // const userId = req.user.id;
+    const allblog = await Blog.find().sort({ createdAt: -1 }).lean();
 
     return res.status(200).json({ message: "all blogs are obtained", allblog });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
-export const ablog = async (req, res) => {
-  const userId = req.user._id;
-  const blogId = req.paramas.id;
 
+export const ablog = async (req, res) => {
   try {
-    const ablog = await find({ userId, blogId });
-    return res.status(200).json({ message: "a blog is obtain " }, ablog);
+    const blogId = req.params.id;
+
+    const blog = await Blog.findOne({ _id: blogId });
+
+    if (!blog) return res.status(400).json({ message: "Blog not found" });
+
+    return res.status(200).json(blog);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }

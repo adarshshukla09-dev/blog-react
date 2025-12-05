@@ -1,11 +1,10 @@
 import cookieParser from "cookie-parser";
 import express from "express";
-import mongoose from "mongoose";
 import blogRouter from "./routes/blog.route.js";
 import userBlog from "./routes/user.routes.js";
 import { connectDB } from "./config/db.js";
 import dotenv from "dotenv";
-
+import cors from "cors";
 dotenv.config();
 
 const app = express();
@@ -17,7 +16,12 @@ connectDB();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser()); // ✅ FIXED
-
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 // routes
 app.get("/", (req, res) => {
   res.send("Notes App Backend API is running...");

@@ -9,10 +9,10 @@ import { protect } from "../middleware/auth.middleware.js";
 import express from "express";
 const router = express.Router();
 
-router.get("/", protect, allblogs);
-router.get("/:id", protect, ablog);
-router.post("/create", protect, createBlog);
-router.put("/:id", protect, editBlog);
-router.delete("/:id", protect, deleteBlog);
+router.get("/", allblogs);
+router.get("/:id", ablog);
+router.post("/create", createBlog);
+router.put("/:id", editBlog);
+router.delete("/:id", deleteBlog);
 
 export default router;

@@ -1,116 +1,229 @@
-import React from 'react'
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom"; // Import useNavigate for delete logic
+import { blogsapi } from "../api/blog.api";
+import { toast } from "react-toastify";
 
-// Dummy Data for illustration
-const stats = [
-  { name: 'Total Revenue', stat: '$45,780', change: '+12%', icon: '💰' },
-  { name: 'New Users', stat: '1,280', change: '+5.1%', icon: '👥' },
-  { name: 'Open Tickets', stat: '14', change: '-20%', icon: '🛠️' },
-  { name: 'Avg. Session', stat: '3:45 min', change: '+1.5%', icon: '⏱️' },
-]
+// --- Helper Components for Cleanliness and Reusability ---
 
-const recentActivities = [
-  { id: 1, type: 'New Blog Post', description: 'Draft titled "Future of Web Dev" was published.', time: '2 mins ago', color: 'bg-indigo-500' },
-  { id: 2, type: 'New User Sign Up', description: 'Jane Smith joined the platform.', time: '1 hour ago', color: 'bg-green-500' },
-  { id: 3, type: 'Payment Failed', description: 'Subscription payment failed for user #104.', time: '4 hours ago', color: 'bg-red-500' },
-  { id: 4, type: 'System Update', description: 'Dashboard v2.1 deployment completed successfully.', time: 'Yesterday', color: 'bg-yellow-500' },
-]
+// 1. Stat Card Component (Optional, but highly recommended for dashboards)
+const StatCard = ({ title, value, icon, color }) => (
+  <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 transform hover:scale-[1.02] transition-transform duration-300">
+    <div className="flex items-center">
+      <div className={`p-3 rounded-full ${color} text-white mr-4`}>
+        <span className="text-xl">{icon}</span>
+      </div>
+      <div>
+        <p className="text-sm font-medium text-gray-500">{title}</p>
+        <p className="text-2xl font-extrabold text-gray-900">{value}</p>
+      </div>
+    </div>
+  </div>
+);
+
+// 2. Main Blog Item Component (For the large 2/3 column)
+const BlogItem = ({ blog, onDelete }) => (
+  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-white rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition">
+    <div className="mb-3 sm:mb-0 sm:mr-4">
+      <Link
+        to={`/blog/${blog._id}`} // Link to the view/read page
+        className="text-lg font-semibold text-gray-900 hover:text-indigo-600 transition"
+      >
+        {blog.title || "Untitled Blog Post"}
+      </Link>
+      <p className="text-sm text-gray-500 mt-1 line-clamp-1">
+        {blog.content.substring(0, 100)}...
+      </p>
+    </div>
+    <div className="flex space-x-3 flex-shrink-0">
+      <Link
+        to={`/edit/${blog._id}`}
+        className="text-sm font-medium text-blue-600 hover:text-blue-800 transition py-1 px-3 rounded-md bg-blue-50"
+      >
+        Edit
+      </Link>
+      <button
+        onClick={() => onDelete(blog._id)}
+        className="text-sm font-medium text-red-600 hover:text-red-800 transition py-1 px-3 rounded-md bg-red-50"
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+);
+// --- End Helper Components ---
+
 
 function Dashboard() {
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Dummy Stats (You would replace these with calculated values from recentActivities)
+  const DUMMY_STATS = [
+    { id: 1, title: "Total Blogs", value: recentActivities.length, icon: "📚", color: "bg-blue-500" },
+    { id: 2, title: "Last Update", value: recentActivities[0] ? new Date(recentActivities[0].updatedAt).toLocaleDateString() : 'N/A', icon: "📅", color: "bg-orange-500" },
+  ];
+
+  const getAllBlogs = async () => {
+    try {
+      const res = await blogsapi.get("/");
+      // Ensure we only store the array of blogs
+      const sortedBlogs = res.data.allblog.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      setRecentActivities(sortedBlogs); 
+    } catch (err) {
+      console.error("Error fetching blogs:", err);
+      toast.error("Failed to load blog data.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getAllBlogs();
+  }, []);
+
+  const handleDelete = async (blogId) => {
+ 
+    try {
+      // Assuming a DELETE endpoint is available
+      await blogsapi.delete(`/${blogId}`); 
+      toast.success("Blog deleted successfully.");
+      // Update the local state to remove the deleted blog without full refresh
+      setRecentActivities(prev => prev.filter(blog => blog._id !== blogId));
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete blog.");
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 lg:p-10 bg-gray-100 min-h-screen font-sans">
-      
       {/* 1. Header Section */}
-      <header className="flex justify-between items-center mb-10">
-        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight mb-4 sm:mb-0">
           Hello, John! 👋
         </h1>
-        <button
-          className="flex items-center bg-indigo-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition shadow-md"
-        >
-          <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
-          New Report
-        </button>
+        <Link to="/create">
+          <button className="flex items-center bg-indigo-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition shadow-lg">
+            <svg
+              className="w-5 h-5 mr-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 4v16m8-8H4"
+              ></path>
+            </svg>
+            New Blog Post
+          </button>
+        </Link>
       </header>
 
-      <hr className="my-8 border-gray-200" />
-
-      {/* 2. Stats Cards Overview */}
-      <section className="mb-12">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">Key Metrics</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((item) => (
-            <div key={item.name} className="bg-white p-6 rounded-xl shadow-lg border-l-4 border-indigo-500 hover:shadow-xl transition duration-200">
-              <p className="text-sm font-medium text-gray-500">{item.name}</p>
-              <div className="flex items-end justify-between mt-2">
-                <p className="text-3xl font-bold text-gray-900">{item.stat}</p>
-                <div className={`text-sm font-semibold ${item.change.startsWith('+') ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100'} px-2 py-0.5 rounded-full`}>
-                  {item.change}
-                </div>
-              </div>
-              <p className="mt-3 text-2xl">{item.icon}</p>
-            </div>
-          ))}
-        </div>
+      {/* 2. Stat Cards Section */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {DUMMY_STATS.map(stat => (
+            <StatCard key={stat.id} {...stat} />
+        ))}
+        {/* Placeholder for a third stat card */}
+         <div className="hidden lg:block bg-white p-6 rounded-xl shadow-lg border border-gray-200 opacity-50">
+            <p className="text-sm font-medium text-gray-500">More Stats Soon</p>
+         </div>
       </section>
 
       <hr className="my-8 border-gray-200" />
 
-      {/* 3. Main Content Grid (Charts & Activities) */}
+      {/* 3. Main Content Grid (Blog List & Recent Activities) */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Left Column: Charts/Main Widgets (2/3 width) */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Sales/Traffic Chart Placeholder */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">Monthly Traffic Overview</h3>
-            {/* Placeholder for a chart library (e.g., Chart.js, Recharts) */}
-            <div className="h-64 flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
-              
-              Traffic Chart Widget
+        {/* Left Column: Your Blogs (2/3 width) - Main Content */}
+        <div className="lg:col-span-2">
+            <h3 className="text-2xl font-bold mb-6 text-gray-800">
+                Your Latest Blog Posts
+            </h3>
+            <div className="space-y-4">
+                {loading ? (
+                    <p className="p-8 bg-white rounded-xl shadow-lg text-center text-gray-500">Loading your posts...</p>
+                ) : recentActivities.length > 0 ? (
+                    recentActivities.slice(0, 5).map((blog) => ( // Show top 5 blogs
+                        <BlogItem 
+                            key={blog._id} 
+                            blog={blog} 
+                            onDelete={handleDelete} 
+                        />
+                    ))
+                ) : (
+                    <div className="p-8 bg-white rounded-xl shadow-lg text-center">
+                        <p className="text-gray-500 mb-4">You haven't posted any blogs yet.</p>
+                        <Link to="/create" className="text-indigo-600 font-medium hover:text-indigo-800 transition">
+                            Start creating your first blog post!
+                        </Link>
+                    </div>
+                )}
             </div>
-          </div>
-
-          {/* User Engagement Placeholder */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800">User Engagement Score</h3>
-            <div className="flex items-center gap-8">
-                <div className="text-5xl font-bold text-indigo-600">8.9</div>
-                <p className="text-gray-600">Score based on daily active users and content interaction frequency.</p>
-            </div>
-          </div>
+            
+            {recentActivities.length > 5 && (
+                <div className="mt-6 text-center">
+                    <Link to="/allblog" className="text-indigo-600 font-medium hover:text-indigo-800 transition">
+                        View All Posts →
+                    </Link>
+                </div>
+            )}
         </div>
 
-        {/* Right Column: Recent Activity (1/3 width) */}
+        {/* Right Column: Recent Activity Timeline (1/3 width) */}
         <div className="lg:col-span-1">
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h3 className="text-xl font-semibold mb-6 text-gray-800">Recent Activity</h3>
-            
+          <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+            <h3 className="text-xl font-semibold mb-6 text-gray-800">
+              Recent Activity
+            </h3>
+
             <ul className="space-y-6">
-              {recentActivities.map((activity, index) => (
-                <li key={activity.id} className="flex items-start space-x-3 border-b pb-4 last:border-b-0 last:pb-0">
-                  {/* Status Indicator (Circle) */}
-                  <div className={`w-3 h-3 rounded-full mt-1 ${activity.color} flex-shrink-0`}></div>
-                  
-                  {/* Text Content */}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{activity.type}</p>
-                    <p className="text-xs text-gray-600 mt-0.5">{activity.description}</p>
-                    <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+              {recentActivities.slice(0, 5).map((activity) => ( // Display only 5 recent activities
+                <li
+                  key={activity._id}
+                  className="flex flex-col border-b pb-4 last:border-b-0 last:pb-0"
+                >
+                  {/* Title and Edit/Delete buttons */}
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="font-semibold text-gray-900 text-base line-clamp-1">
+                      {activity.title}
+                    </p>
+                    {/* Action buttons in the activity pane */}
+                    <div className="flex space-x-2 text-xs flex-shrink-0">
+                        <Link to={`/edit/${activity._id}`} className="text-blue-500 hover:text-blue-700">Edit</Link>
+                        <button onClick={() => handleDelete(activity._id)} className="text-red-500 hover:text-red-700">Del</button>
+                    </div>
                   </div>
+                  
+                  {/* Content snippet and Timestamp */}
+                  <p className="text-sm text-gray-600 line-clamp-2">
+                    {activity.content.substring(0, 50)}...
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(activity.updatedAt).toLocaleTimeString()} on {new Date(activity.updatedAt).toLocaleDateString()}
+                  </p>
                 </li>
               ))}
+
+              {recentActivities.length === 0 && !loading && (
+                <p className="text-sm text-gray-500">No activity yet.</p>
+              )}
             </ul>
-            
-            <button className="w-full mt-6 text-indigo-600 font-medium py-2 rounded-lg hover:bg-indigo-50 transition">
-                View All Activity →
-            </button>
+            <Link to="/allblog">
+              <button
+                className="w-full mt-6 text-indigo-600 font-medium py-2 rounded-lg hover:bg-indigo-50 transition"
+              >
+                View All Posts →
+              </button>
+            </Link>
           </div>
         </div>
       </section>
-
     </div>
-  )
+  );
 }
 
-export default Dashboard
+export default Dashboard;

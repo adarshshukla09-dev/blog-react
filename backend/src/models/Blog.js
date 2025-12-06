@@ -17,6 +17,8 @@ const BlogSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    imageUrl: String,
+    imagePublicId: { type: String, default: null }, // useful for future delete
   },
   { timestamps: true }
 );

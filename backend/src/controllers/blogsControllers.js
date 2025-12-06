@@ -1,61 +1,123 @@
 import Blog from "../models/Blog.js";
-
+import upload from "./middleware/Upload.js";
+import cloudinary from "./config/cloudinary.js";
 export const createBlog = async (req, res) => {
   try {
     const { title, content } = req.body;
-    const newBlog = new Blog({ title, content });
-    newBlog.save();
+
+    let imageUrl = null;
+
+    // upload image if available
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream({ folder: "blogs" }, (err, uploaded) => {
+            if (err) reject(err);
+            else resolve(uploaded);
+          })
+          .end(req.file.buffer);
+      });
+
+      imageUrl = result.secure_url;
+    }
+
+    // create blog
+    const newBlog = new Blog({
+      title,
+      content,
+      imageUrl,
+    });
+
+    await newBlog.save(); // <-- important!
+
     res.status(200).json({
       _id: newBlog.id,
       title: newBlog.title,
       content: newBlog.content,
+      imageUrl: newBlog.imageUrl, // <-- include this
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+import Blog from "../models/Blog.js";
+import cloudinary from "../config/cloudinary.js";
+
+export const editBlog = async (req, res) => {
+  try {
+    const blogId = req.params.id;
+    const { title, content } = req.body;
+
+    // Find existing blog
+    const blog = await Blog.findById(blogId);
+    if (!blog) {
+      return res.status(404).json({ message: "Blog not found" });
+    }
+
+    let imageUrl = blog.imageUrl;
+    let imagePublicId = blog.imagePublicId;
+
+    // If new image provided
+    if (req.file) {
+      // 1️⃣ Delete old Cloudinary image
+      if (blog.imagePublicId) {
+        await cloudinary.uploader.destroy(blog.imagePublicId);
+      }
+
+      // 2️⃣ Upload new image
+      const uploaded = await new Promise((resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream({ folder: "blogs" }, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          })
+          .end(req.file.buffer);
+      });
+
+      imageUrl = uploaded.secure_url;
+      imagePublicId = uploaded.public_id;
+    }
+
+    // 3️⃣ Update database
+    blog.title = title || blog.title;
+    blog.content = content || blog.content;
+    blog.imageUrl = imageUrl;
+    blog.imagePublicId = imagePublicId;
+
+    await blog.save();
+
+    res.status(200).json({
+      message: "Blog updated successfully",
+      blog,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-export const editBlog = async (req, res) => {
+export const deleteBlog = async (req, res) => {
   try {
-    const { title, content } = req.body;
-    // const userId = req.user.id;
     const blogId = req.params.id;
-    console.log(blogId);
-    const blog = await Blog.findOneAndUpdate(
-      {
-        _id: blogId,
-        // userId,
-      },
-      { title, content },
-      { new: true, runValidators: true }
-    );
+
+    // Find blog
+    const blog = await Blog.findById(blogId);
     if (!blog) {
-      return res.status(400).json({ message: error.message });
+      return res.status(404).json({ message: "Blog not found" });
     }
 
+    // 1️⃣ Delete image from Cloudinary
+    if (blog.imagePublicId) {
+      await cloudinary.uploader.destroy(blog.imagePublicId);
+    }
+
+    // 2️⃣ Delete blog from database
+    await Blog.findByIdAndDelete(blogId);
+
     res.status(200).json({
-      _id: blog.id,
-      title: blog.title,
-      content: blog.content,
+      message: "Blog and image deleted successfully",
     });
   } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-};
-
-export const deleteBlog = async (req, res) => {
-  // const userId = req.user.id;
-  const delBlog = req.params.id;
-  try {
-    const deleteBlog = await Blog.findOneAndDelete({ _id: delBlog });
-    if (!deleteBlog) return res.status(400).json({ message: error.message });
-
-    return res.status(200).json({
-      message: "blogs deleted successfully",
-      blog: deleteBlog,
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -81,5 +143,24 @@ export const ablog = async (req, res) => {
     return res.status(200).json(blog);
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+};
+
+export const uploadImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+    const result = await new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream({ folder: "my-images" }, (error, uploaded) => {
+          if (error) reject(error);
+          else resolve(uploaded);
+        })
+        .end(req.file.buffer);
+    });
+
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
